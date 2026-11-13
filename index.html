@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IT 321 Quiz 2 – Online Exam</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--text:#1d2330;--muted:#5d667a;--line:#d9dde5;--accent:#1f5fbf;--ok:#1a7f45;--bad:#b3261e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171d;--card:#1e232c;--text:#eceff4;--muted:#9aa3b5;--line:#343b49;--accent:#6aa3f5;--ok:#4cc985;--bad:#ff8a80}}
+:root[data-theme="dark"]{--bg:#14171d;--card:#1e232c;--text:#eceff4;--muted:#9aa3b5;--line:#343b49;--accent:#6aa3f5;--ok:#4cc985;--bad:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.4rem;margin:8px 0 4px}
+p.sub{color:var(--muted);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+#exam,#exam *{-webkit-user-select:none;user-select:none}
+label.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-top:8px;cursor:pointer}
+label.opt:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+input[type=text]{width:100%;padding:12px;font-size:1rem;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+button{font:inherit;font-weight:600;padding:12px 22px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+.q{font-weight:600;margin:0 0 4px}
+.hidden{display:none!important}
+#timer{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
+#timer .t{font-size:1.5rem;font-variant-numeric:tabular-nums}
+#timer.low .t{color:var(--bad)}
+.result{text-align:center}
+.score{font-size:3rem;font-weight:700;margin:8px 0}
+.status{font-size:1.4rem;font-weight:700}
+.pass{color:var(--ok)}.fail{color:var(--bad)}
+.err{color:var(--bad);margin:8px 0 0;min-height:1.2em}
+.rules{margin:0 0 14px;padding-left:20px;color:var(--muted)}
+#warn{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:24px;z-index:99}
+#warn .box{background:var(--card);border-radius:12px;padding:24px;max-width:420px;text-align:center}
+#warn h2{color:var(--bad);margin:0 0 8px}
+#cfg{background:color-mix(in srgb,var(--bad) 15%,transparent);border:1px solid var(--bad);border-radius:8px;padding:10px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>IT 321 – Quiz 2: EA Components, Frameworks &amp; Artifacts</h1>
+<p class="sub">10 items · Multiple choice · Passing score: 50%</p>
+
+<section id="start" class="card">
+  <div id="cfg" class="hidden">Email alerts are not set up yet (instructor: see FORM_ENDPOINT in the file).</div>
+  <ul class="rules">
+    <li>You have <b>11 minutes</b>. The exam is submitted automatically when time runs out.</li>
+    <li>Stay on this screen until you submit. Leaving it (switching tabs, windows or apps) gives you <b>1 warning</b>. The next time, your instructor is emailed with your name and your exam is submitted automatically.</li>
+    <li>Copying, pasting and right-click are disabled.</li>
+  </ul>
+  <p class="q">Enter your full name</p>
+  <input id="name" type="text" placeholder="Last name, First name" autocomplete="off">
+  <p class="err" id="nameErr"></p>
+  <button id="startBtn">Start Exam</button>
+</section>
+
+<section id="exam" class="hidden">
+  <div id="timer"><span>Time left</span><span class="t" id="tLeft">11:00</span></div>
+  <div id="questions"></div>
+  <p class="err" id="examErr"></p>
+  <button id="submitBtn">Submit Answers</button>
+</section>
+
+<section id="result" class="card result hidden">
+  <div id="rName" class="q"></div>
+  <div class="score" id="rScore"></div>
+  <div id="rPct" class="sub"></div>
+  <div class="status" id="rStatus"></div>
+  <p class="sub" id="rNote" style="margin-top:18px"></p>
+</section>
+</main>
+
+<div id="warn" class="hidden">
+  <div class="box">
+    <h2>Warning</h2>
+    <p id="warnMsg"></p>
+    <button id="warnBtn">Return to exam</button>
+  </div>
+</div>
+
+<script>
+/* ===== INSTRUCTOR SETTINGS ===== */
+// 1) Create a free form at https://formspree.io using x021ph@gmail.com
+// 2) Paste its URL below, e.g. "https://formspree.io/f/abcdwxyz"
+const FORM_ENDPOINT = "https://formspree.io/f/mdegkyen";
+const WARNINGS_BEFORE_EMAIL = 1;  // free warnings before you are emailed
+const MAX_VIOLATIONS = 2;   // auto-submit when reached
+const EXAM_MINUTES = 11;
+const PASS_PERCENT = 50;
+/* =============================== */
+
+// a = index of the correct choice in the original order
+const BANK = [
+ {q:"Which is a major EA component?",c:["Business architecture","Restaurant menu","Sports ranking","Calendar theme"],a:0},
+ {q:"A framework in EA is mainly used to:",c:["Replace hardware","Guide and structure architecture work","Install software automatically","Remove business goals"],a:1},
+ {q:"Which framework is well known for the Architecture Development Method?",c:["TOGAF","HTML","CSS","SQL"],a:0},
+ {q:"Which framework is known for a classification matrix of views?",c:["Zachman","Python","Linux","DHCP"],a:0},
+ {q:"FEAF is commonly associated with:",c:["Gaming architecture","Government-related enterprise architecture","Animation systems","Wireless charging"],a:1},
+ {q:"An artifact in EA is:",c:["A random file","A documented output such as a matrix or diagram","A broken tool","A network cable only"],a:1},
+ {q:"Which of the following is an example of an EA artifact?",c:["Application portfolio","Keyboard layout","Music playlist","Exam seat plan"],a:0},
+ {q:"A roadmap artifact is used to show:",c:["Weather updates","Current-to-future transition","Printer ink levels","Student attendance only"],a:1},
+ {q:"Components, frameworks, and artifacts are related because they:",c:["Help model, guide, and document the enterprise","Remove the need for planning","Focus only on social media","Replace all policies"],a:0},
+ {q:"Which statement is most accurate?",c:["Frameworks and artifacts mean the same thing","Components are outputs, and artifacts are departments","Frameworks guide work while artifacts record results","Artifacts are only for decoration"],a:2}
+];
+const $ = id => document.getElementById(id);
+function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+const configured = !FORM_ENDPOINT.includes("PASTE_");
+if(!configured) $("cfg").classList.remove("hidden");
+
+let exam=[], studentName="", violations=0, running=false, finished=false, lastV=0, usedFS=false;
+
+async function notify(event, extra){
+  if(!configured) return;
+  try{
+    await fetch(FORM_ENDPOINT,{method:"POST",keepalive:true,
+      headers:{"Content-Type":"application/json","Accept":"application/json"},
+      body:JSON.stringify(Object.assign({
+        _subject:"IT 321 Quiz 2 – "+event+" – "+studentName,
+        student:studentName,event:event,
+        time:new Date().toLocaleString(),violations:violations
+      },extra||{}))});
+  }catch(e){}
+}
+
+function violation(reason){
+  if(!running||finished) return;
+  const now=Date.now();
+  if(now-lastV<1500) return;   // avoid double counting blur + hidden
+  lastV=now; violations++;
+  if(violations>WARNINGS_BEFORE_EMAIL) notify("Left exam screen ("+reason+") – violation "+violations);
+  if(violations>=MAX_VIOLATIONS){ finish("you left the exam screen too many times"); return; }
+  $("warnMsg").textContent="You left the exam screen. This is your only warning. If you leave again, your instructor will be emailed and your exam will be submitted automatically.";
+  $("warn").classList.remove("hidden");
+}
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) violation("tab or app switched"); });
+window.addEventListener("blur",()=>violation("window lost focus"));
+document.addEventListener("fullscreenchange",()=>{ if(usedFS&&!document.fullscreenElement) violation("exited full screen"); });
+$("warnBtn").onclick=()=>{
+  $("warn").classList.add("hidden");
+  const el=document.documentElement;
+  if(usedFS&&el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+};
+["copy","cut","paste","contextmenu","dragstart","selectstart"].forEach(ev=>
+  document.addEventListener(ev,e=>{ if(running&&e.target.tagName!=="INPUT") e.preventDefault(); }));
+document.addEventListener("keydown",e=>{
+  if(!running) return;
+  const k=e.key.toLowerCase();
+  if(e.key==="F12"||e.key==="PrintScreen"||((e.ctrlKey||e.metaKey)&&["c","v","x","p","s","u"].includes(k))||(e.ctrlKey&&e.shiftKey&&["i","j","c"].includes(k))) e.preventDefault();
+});
+
+$("startBtn").onclick=async()=>{
+  const n=$("name").value.trim();
+  if(n.length<2){$("nameErr").textContent="Please enter your name.";return;}
+  studentName=n;
+  exam=shuffle(BANK).map(it=>({q:it.q,choices:shuffle(it.c.map((t,i)=>({text:t,correct:i===it.a})))}));
+  const box=$("questions"); box.innerHTML="";
+  exam.forEach((it,qi)=>{
+    const card=document.createElement("div"); card.className="card";
+    const h=document.createElement("p"); h.className="q"; h.textContent=(qi+1)+". "+it.q; card.appendChild(h);
+    it.choices.forEach((ch,ci)=>{
+      const lab=document.createElement("label"); lab.className="opt";
+      const r=document.createElement("input"); r.type="radio"; r.name="q"+qi; r.value=ci;
+      const s=document.createElement("span"); s.textContent=ch.text;
+      lab.append(r,s); card.appendChild(lab);
+    });
+    box.appendChild(card);
+  });
+  $("start").classList.add("hidden"); $("exam").classList.remove("hidden"); window.scrollTo(0,0);
+  try{ await document.documentElement.requestFullscreen(); usedFS=true; }catch(e){}
+  running=true; lastV=Date.now()+1500;
+  startTimer();
+  notify("Exam started");
+};
+
+let endAt=0,tick=null;
+function startTimer(){
+  endAt=Date.now()+EXAM_MINUTES*60000;
+  const upd=()=>{
+    const ms=Math.max(0,endAt-Date.now()), sec=Math.ceil(ms/1000);
+    $("tLeft").textContent=String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+    $("timer").classList.toggle("low",sec<=60);
+    if(ms<=0){clearInterval(tick);finish("time is up");}
+  };
+  upd(); tick=setInterval(upd,500);
+}
+function finish(reason){
+  if(finished) return;
+  let score=0;
+  exam.forEach((it,qi)=>{
+    const sel=document.querySelector('input[name="q'+qi+'"]:checked');
+    if(sel&&it.choices[+sel.value].correct) score++;
+  });
+  finished=true; running=false; clearInterval(tick);
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  const total=exam.length, pct=Math.round(score/total*100), passed=pct>=PASS_PERCENT;
+  $("warn").classList.add("hidden");
+  $("rName").textContent=studentName;
+  $("rScore").textContent=score+" / "+total;
+  $("rPct").textContent=pct+"%";
+  $("rStatus").textContent=passed?"PASSED":"FAILED";
+  $("rStatus").className="status "+(passed?"pass":"fail");
+  $("rNote").textContent=(reason?"Your exam was submitted automatically because "+reason+". ":"")+"Take a screenshot of this screen and submit it to your instructor.";
+  $("exam").classList.add("hidden"); $("result").classList.remove("hidden"); window.scrollTo(0,0);
+  notify(reason?"Exam auto-submitted ("+reason+")":"Exam submitted",{score:score+"/"+total,percent:pct+"%",result:passed?"PASSED":"FAILED"});
+}
+$("submitBtn").onclick=()=>{
+  const un=exam.filter((_,qi)=>!document.querySelector('input[name="q'+qi+'"]:checked')).length;
+  if(un>0){$("examErr").textContent="You have "+un+" unanswered item"+(un>1?"s":"")+". Please answer all items before submitting.";return;}
+  finish(false);
+};
+</script>
+</body>
+</html>
